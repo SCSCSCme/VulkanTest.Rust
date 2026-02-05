@@ -1,14 +1,25 @@
-use anyhow::Result;
+use anyhow::{Result, Context};
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::bytecode::Bytecode;
+
 use crate::AppData;
+use crate::core;
 
 pub unsafe fn create_pipeline(device: &Device, data: &mut AppData) -> Result<()> {
-    let vert = include_bytes!("../../shaders/vert.spv");
-    let frag = include_bytes!("../../shaders/frag.spv");
+    let vert_binary = core::compiler::compile_shader("src/shader/shader.vert", shaderc::ShaderKind::Vertex)
+        .context("Failed to compile vertex shader")?;
+    let frag_binary = core::compiler::compile_shader("src/shader/shader.frag", shaderc::ShaderKind::Fragment)
+        .context("Failed to compile fragment shader")?;
 
-    let vert_shader_module = create_shader_module(device, &vert[..])?;
-    let frag_shader_module = create_shader_module(device, &frag[..])?;
+    let vert_temp_slice = unsafe {
+        std::slice::from_raw_parts(vert_binary.as_ptr() as *const u8, vert_binary.len() * 4)
+    };
+    let frag_temp_slice = unsafe {
+        std::slice::from_raw_parts(frag_binary.as_ptr() as *const u8, frag_binary.len() * 4)
+    };
+
+    let vert_shader_module = create_shader_module(device, vert_temp_slice)?;
+    let frag_shader_module = create_shader_module(device, frag_temp_slice)?;
 
     let vert_stage = vk::PipelineShaderStageCreateInfo::builder()
         .stage(vk::ShaderStageFlags::VERTEX)
