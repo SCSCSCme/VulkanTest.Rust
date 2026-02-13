@@ -52,11 +52,22 @@ fn main() -> Result<()> {
 
     // App
     let mut app = unsafe { App::create(&window)? };
+    let mut minimized = false;
     event_loop.run(move |event, elwt| {
         match event {
             Event::AboutToWait => window.request_redraw(),
             Event::WindowEvent { event, .. } => match event {
-                WindowEvent::RedrawRequested if !elwt.exiting() => unsafe { app.render(&window) }.unwrap(),
+                WindowEvent::RedrawRequested if !elwt.exiting() && !minimized => { 
+                    unsafe { app.render(&window) }.unwrap();
+                },
+                WindowEvent::Resized(size) => {
+                    if size.width == 0 || size.height == 0 {
+                        minimized = true;
+                    } else {
+                        minimized = false;
+                        app.resized = true;
+                    }
+                },
                 WindowEvent::CloseRequested => {
                     elwt.exit();
                         unsafe { app.destroy(); }
@@ -97,6 +108,9 @@ pub struct AppData {
     pub render_finished_semaphores: Vec<vk::Semaphore>,
     pub in_flight_fences: Vec<vk::Fence>,
     pub images_in_flight: Vec<vk::Fence>,
+
+    pub vertex_buffer: vk::Buffer,
+    pub vertex_buffer_memory: vk::DeviceMemory,
 }
 
 #[derive(Clone, Debug)]
@@ -126,6 +140,7 @@ impl App {
         core::pipeline::create_framebuffers(&device, &mut data)?;
 
         core::commands::create_command_pool(&instance, &device, &mut data)?;
+        core::vertex::create_vertex_buffer(&instance, &device, &mut data)?;
         core::commands::create_command_buffers(&device, &mut data)?;
         core::commands::create_sync_objects(&device, &mut data)?;
 
@@ -205,6 +220,8 @@ impl App {
 
     unsafe fn destroy(&mut self) {
         core::swapchain::destroy_swapchain(&self.device, &mut self.data);
+        self.device.destroy_buffer(self.data.vertex_buffer, None);
+        self.device.free_memory(self.data.vertex_buffer_memory, None);
         self.device.device_wait_idle().unwrap();
         self.data.in_flight_fences.iter().for_each(|f| self.device.destroy_fence(*f, None));
         self.data.render_finished_semaphores.iter().for_each(|s| self.device.destroy_semaphore(*s, None));
