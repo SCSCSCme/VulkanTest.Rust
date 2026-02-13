@@ -2,11 +2,39 @@ use anyhow::Result;
 use winit::window::Window;
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::vk::KhrSwapchainExtensionDeviceCommands;
+use vulkanalia::vk::KhrSurfaceExtensionInstanceCommands;
 
 use crate::AppData;
 use crate::QueueFamilyIndices;
-use crate::SwapchainSupport;
 use crate::core;
+
+
+#[derive(Clone, Debug)]
+pub struct SwapchainSupport {
+    pub capabilities: vk::SurfaceCapabilitiesKHR,
+    pub formats: Vec<vk::SurfaceFormatKHR>,
+    pub present_modes: Vec<vk::PresentModeKHR>,
+}
+
+impl SwapchainSupport {
+    pub unsafe fn get(
+        instance: &Instance,
+        data: &AppData,
+        physical_device: vk::PhysicalDevice
+    ) -> Result<Self> {
+        Ok( Self {
+            capabilities: instance
+                .get_physical_device_surface_capabilities_khr(
+                    physical_device, data.surface)?,
+            formats: instance
+                .get_physical_device_surface_formats_khr(
+                    physical_device, data.surface)?,
+            present_modes: instance
+                .get_physical_device_surface_present_modes_khr(
+                        physical_device, data.surface)?,
+        })
+    }
+}
 
 pub unsafe fn create_swapchain(
     window: &Window,
@@ -98,7 +126,6 @@ pub unsafe fn create_swapchain_image_views(
 pub unsafe fn recreate_swapchain(instance: &Instance, device: &Device, window: &Window, data: &mut AppData) -> Result<()> {
     device.device_wait_idle()?;
     let old_swapchain = data.swapchain;
-    destroy_swapchain(device, data);
     core::swapchain::create_swapchain(window, &instance, &device, data, old_swapchain)?;
     if old_swapchain != vk::SwapchainKHR::null() {
         unsafe { device.destroy_swapchain_khr(old_swapchain, None); }
@@ -115,16 +142,12 @@ pub unsafe fn recreate_swapchain(instance: &Instance, device: &Device, window: &
 }
 
 pub unsafe fn destroy_swapchain(device: &Device, data: &mut AppData,){
-    data.framebuffers
-        .iter()
-        .for_each(|f| device.destroy_framebuffer(*f, None));
     device.free_command_buffers(data.command_pool, &data.command_buffers);
+    data.framebuffers.iter().for_each(|f| device.destroy_framebuffer(*f, None));
     device.destroy_pipeline(data.pipeline, None);
     device.destroy_pipeline_layout(data.pipeline_layout, None);
     device.destroy_render_pass(data.render_pass, None);
-    data.swapchain_image_views
-        .iter()
-        .for_each(|v| device.destroy_image_view(*v, None));
+    data.swapchain_image_views.iter().for_each(|v| device.destroy_image_view(*v, None));
     device.destroy_swapchain_khr(data.swapchain, None);
 }
 

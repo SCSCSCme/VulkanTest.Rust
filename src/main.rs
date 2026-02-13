@@ -219,13 +219,15 @@ impl App {
     }
 
     unsafe fn destroy(&mut self) {
-        core::swapchain::destroy_swapchain(&self.device, &mut self.data);
-        self.device.destroy_buffer(self.data.vertex_buffer, None);
-        self.device.free_memory(self.data.vertex_buffer_memory, None);
         self.device.device_wait_idle().unwrap();
+
+        core::swapchain::destroy_swapchain(&self.device, &mut self.data);
+
         self.data.in_flight_fences.iter().for_each(|f| self.device.destroy_fence(*f, None));
         self.data.render_finished_semaphores.iter().for_each(|s| self.device.destroy_semaphore(*s, None));
         self.data.image_available_semaphores.iter().for_each(|s| self.device.destroy_semaphore(*s, None));
+        self.device.free_memory(self.data.vertex_buffer_memory, None);
+        self.device.destroy_buffer(self.data.vertex_buffer, None);
         self.device.destroy_command_pool(self.data.command_pool, None);
         self.device.destroy_device(None);
         if VALIDATION_ENABLED {
@@ -272,34 +274,6 @@ impl QueueFamilyIndices {
         }
     }
 }
-
-#[derive(Clone, Debug)]
-pub struct SwapchainSupport {
-    capabilities: vk::SurfaceCapabilitiesKHR,
-    formats: Vec<vk::SurfaceFormatKHR>,
-    present_modes: Vec<vk::PresentModeKHR>,
-}
-
-impl SwapchainSupport {
-    unsafe fn get(
-        instance: &Instance,
-        data: &AppData,
-        physical_device: vk::PhysicalDevice
-    ) -> Result<Self> {
-        Ok( Self {
-            capabilities: instance
-                .get_physical_device_surface_capabilities_khr(
-                    physical_device, data.surface)?,
-            formats: instance
-                .get_physical_device_surface_formats_khr(
-                    physical_device, data.surface)?,
-            present_modes: instance
-                .get_physical_device_surface_present_modes_khr(
-                    physical_device, data.surface)?,
-        })
-    }
-}
-
 extern "system" fn debug_callback(
     severity: vk::DebugUtilsMessageSeverityFlagsEXT,
     type_: vk::DebugUtilsMessageTypeFlagsEXT,
@@ -474,7 +448,7 @@ unsafe fn check_physical_device(instance: &Instance, data: &mut AppData, physica
         return Err(anyhow!(SuitabilityError("Missing geometry shader support.")));
     }
     check_physical_device_extensions(instance, physical_device)?;
-    let support = SwapchainSupport::get(instance, data, physical_device)?;
+    let support = core::swapchain::SwapchainSupport::get(instance, data, physical_device)?;
     if support.formats.is_empty() || support.present_modes.is_empty() {
         return Err(anyhow!(SuitabilityError("Insufficient swapchain support.")));
     }

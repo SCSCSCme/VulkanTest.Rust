@@ -10,9 +10,9 @@ use crate::AppData;
 type Vec2 = cgmath::Vector2<f32>;
 type Vec3 = cgmath::Vector3<f32>;
 
-static VERTICES: [Vertex; 3] = [
-    Vertex::new(vec2(0.0, -0.5), vec3(1.0, 0.0, 0.0)),
-    Vertex::new(vec2(0.5, 0.5), vec3(1.0, 0.0, 0.0)),
+pub static VERTICES: [Vertex; 3] = [
+    Vertex::new(vec2(0.0, -0.5), vec3(0.0, 0.0, 1.0)),
+    Vertex::new(vec2(0.5, 0.5), vec3(0.0, 1.0, 0.0)),
     Vertex::new(vec2(-0.5, 0.5), vec3(1.0, 0.0, 0.0)),
 ];
 
@@ -47,7 +47,7 @@ impl Vertex {
             .binding(0)
             .location(1)
             .format(vk::Format::R32G32B32_SFLOAT)
-            .offset(0)
+            .offset(8)
             .build();
 
         [pos, color]
@@ -88,6 +88,8 @@ pub unsafe fn create_vertex_buffer(
     )?;
 
     memcpy(VERTICES.as_ptr(), memory.cast(), VERTICES.len());
+    device.unmap_memory(data.vertex_buffer_memory);
+
     Ok(())
 }
 
