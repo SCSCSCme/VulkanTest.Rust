@@ -5,3 +5,4 @@ pub mod swapchain;
 pub mod commands;
 pub mod compiler;
 pub mod vertex;
+pub mod descriptor;

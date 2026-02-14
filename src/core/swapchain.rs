@@ -126,9 +126,10 @@ pub unsafe fn create_swapchain_image_views(
 pub unsafe fn recreate_swapchain(instance: &Instance, device: &Device, window: &Window, data: &mut AppData) -> Result<()> {
     device.device_wait_idle()?;
     let old_swapchain = data.swapchain;
+    cleanup_swapchain_resources(device, data);
     core::swapchain::create_swapchain(window, &instance, &device, data, old_swapchain)?;
     if old_swapchain != vk::SwapchainKHR::null() {
-        unsafe { device.destroy_swapchain_khr(old_swapchain, None); }
+        device.destroy_swapchain_khr(old_swapchain, None);
     }
     core::swapchain::create_swapchain_image_views(&device, data)?;
 
@@ -141,14 +142,18 @@ pub unsafe fn recreate_swapchain(instance: &Instance, device: &Device, window: &
     Ok(())
 }
 
-pub unsafe fn destroy_swapchain(device: &Device, data: &mut AppData,){
+pub unsafe fn destroy_swapchain(device: &Device, data: &mut AppData){
+    cleanup_swapchain_resources(device, data);
+    device.destroy_swapchain_khr(data.swapchain, None);
+}
+
+unsafe fn cleanup_swapchain_resources(device: &Device, data: &mut AppData) {
     device.free_command_buffers(data.command_pool, &data.command_buffers);
     data.framebuffers.iter().for_each(|f| device.destroy_framebuffer(*f, None));
     device.destroy_pipeline(data.pipeline, None);
     device.destroy_pipeline_layout(data.pipeline_layout, None);
     device.destroy_render_pass(data.render_pass, None);
     data.swapchain_image_views.iter().for_each(|v| device.destroy_image_view(*v, None));
-    device.destroy_swapchain_khr(data.swapchain, None);
 }
 
 fn get_swapchain_surface_format(
